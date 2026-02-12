@@ -5,11 +5,18 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const { connectDB } = require('./database/db');
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
+const fs = require('fs');
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
+// Inicializar Firebase apenas se o arquivo de credenciais existir
+if (fs.existsSync('./serviceAccountKey.json')) {
+    const serviceAccount = require('./serviceAccountKey.json');
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('Firebase Admin inicializado');
+} else {
+    console.log('Firebase Admin não inicializado (serviceAccountKey.json não encontrado)');
+}
 
 const app = express();
 connectDB();
