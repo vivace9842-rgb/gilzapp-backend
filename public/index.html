@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GilZapp Web - Premium CRM & Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0b141a;
+            color: #e9edef;
+        }
+
+        .sage-green {
+            background-color: #7C8F79;
+        }
+
+        .gold-text {
+            color: #D4AF37;
+        }
+
+        .gold-border {
+            border-color: #D4AF37;
+        }
+
+        .glass {
+            background: rgba(31, 44, 51, 0.8);
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-bg {
+            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+            background-blend-mode: overlay;
+            background-color: #0b141a;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body class="h-screen flex items-center justify-center p-4">
+    <div id="app"
+        class="w-full max-w-md h-[85vh] glass rounded-3xl overflow-hidden shadow-2xl border-t-2 gold-border flex flex-col">
+        <!-- Header -->
+        <header class="p-5 flex items-center justify-between border-b border-gray-700 bg-[#1f2c33]">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 sage-green rounded-full flex items-center justify-center border gold-border">
+                    <i data-lucide="message-square" class="text-white w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold gold-text">GilZapp <span
+                            class="text-[10px] uppercase tracking-widest text-gray-400">Web</span></h1>
+                    <p class="text-[10px] text-gray-400">Ambiente Profissional</p>
+                </div>
+            </div>
+            <div class="flex space-x-4 text-gray-400">
+                <i data-lucide="briefcase" class="w-5 h-5 cursor-pointer hover:text-[#D4AF37]"></i>
+                <i data-lucide="more-vertical" class="w-5 h-5 cursor-pointer"></i>
+            </div>
+        </header>
+
+        <!-- Main Content (Login initially) -->
+        <div id="login-screen"
+            class="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center space-y-8 bg-[#121b22]">
+            <div class="text-center space-y-4">
+                <h2 class="text-2xl font-semibold gold-text">Bem-vindo, Gilberto!</h2>
+                <p class="text-gray-400 text-sm px-6">Insira seu e-mail e senha para entrar no ambiente GilZapp.</p>
+            </div>
+
+            <div class="w-full space-y-4">
+                <div class="relative">
+                    <input type="email" id="email" placeholder="E-mail" value="gilberto@gilzapp.com"
+                        class="w-full bg-[#1f2c33] border gold-border rounded-xl p-4 pl-12 text-white outline-none focus:ring-2 ring-[#7C8F79] transition-all">
+                    <i data-lucide="mail" class="absolute left-4 top-4 text-gray-500 w-5 h-5"></i>
+                </div>
+                <div class="relative">
+                    <input type="password" id="password" placeholder="Senha" value="gilzapp_secret"
+                        class="w-full bg-[#1f2c33] border gold-border rounded-xl p-4 pl-12 text-white outline-none focus:ring-2 ring-[#7C8F79] transition-all">
+                    <i data-lucide="lock" class="absolute left-4 top-4 text-gray-500 w-5 h-5"></i>
+                </div>
+                <div id="login-error" class="text-red-500 text-xs text-center hidden">E-mail ou senha incorretos</div>
+                <button onclick="handleLogin()" id="loginBtn"
+                    class="w-full sage-green hover:opacity-90 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2">
+                    <span>ACESSAR SISTEMA</span>
+                    <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <p class="text-[10px] text-gray-500 uppercase tracking-tighter">Powered by GilZapp CRM Engine v2.0</p>
+        </div>
+
+        <!-- Chat Screen (Hidden) -->
+        <div id="chat-view" class="hidden flex-1 flex flex-col chat-bg">
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Messages will appear here -->
+            </div>
+            <div class="p-4 bg-[#1f2c33] flex items-center space-x-2">
+                <i data-lucide="plus" class="text-gray-400 cursor-pointer"></i>
+                <input type="text" id="msgInput" placeholder="Sua mensagem profissional..."
+                    class="flex-1 bg-[#121b22] border-none rounded-full px-4 py-2 text-white outline-none">
+                <div
+                    class="w-10 h-10 sage-green rounded-full flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all">
+                    <i data-lucide="send" class="text-white w-5 h-5" onclick="sendMsg()"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const socket = io();
+        let currentUser = null;
+
+        async function handleLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+            const error = document.getElementById('login-error');
+
+            error.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = '<span>CARREGANDO...</span>';
+
+            try {
+                const response = await fetch('/api/auth/login-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    currentUser = data.user;
+                    startApp();
+                } else {
+                    error.textContent = data.message || 'Erro ao fazer login';
+                    error.classList.remove('hidden');
+                }
+            } catch (err) {
+                error.textContent = 'Erro de conexão com o servidor';
+                error.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>ACESSAR SISTEMA</span><i data-lucide="arrow-right" class="w-5 h-5"></i>';
+                lucide.createIcons();
+            }
+        }
+
+        function startApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('chat-view').classList.remove('hidden');
+            document.getElementById('messages').innerHTML += `
+                <div class="bg-[#1f2c33] p-3 rounded-2xl rounded-tl-none max-w-[80%] border-l-2 border-[#D4AF37]">
+                    <p class="text-xs gold-text font-bold mb-1"> GilZapp AI</p>
+                    <p class="text-sm">Olá, ${currentUser.name}! O sistema está online e seguro. 🌿✨</p>
+                    <p class="text-[8px] text-right mt-1 text-gray-500">Acesso realizado com e-mail</p>
+                </div>
+            `;
+        }
+
+        function sendMsg() {
+            const input = document.getElementById('msgInput');
+            if (input.value.trim()) {
+                const text = input.value;
+                document.getElementById('messages').innerHTML += `
+                    <div class="bg-[#7C8F79] p-3 rounded-2xl rounded-tr-none max-w-[80%] self-end ml-auto text-white">
+                        <p class="text-sm">${text}</p>
+                        <p class="text-[8px] text-right mt-1 opacity-60">Agora</p>
+                    </div>
+                `;
+                socket.emit('sendMessage', { text, user: currentUser });
+                input.value = '';
+                const msgBox = document.getElementById('messages');
+                msgBox.scrollTop = msgBox.scrollHeight;
+            }
+        }
+    </script>
+</body>
+
+</html>
